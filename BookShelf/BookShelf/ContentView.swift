@@ -116,6 +116,7 @@ struct BookCard: View {
     let hasChapters: Bool
     @State private var cover: NSImage?
     @State private var showChapters = false
+    @State private var readFraction: Double = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -134,7 +135,7 @@ struct BookCard: View {
                 .lineLimit(1)
                 .frame(width: 160, alignment: .leading)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 statusMenu
                 if hasChapters {
                     Button { showChapters = true } label: {
@@ -145,12 +146,25 @@ struct BookCard: View {
                     .buttonStyle(.plain)
                     .help("Show chapters")
                 }
+                if readFraction > 0 {
+                    Spacer()
+                    Text("\(Int(readFraction * 100))%")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                }
             }
+            .frame(width: 160)
         }
         .contentShape(Rectangle())
         .onTapGesture { openBook() }
-        .task { await loadCover() }
-        .sheet(isPresented: $showChapters) {
+        .task {
+            await loadCover()
+            readFraction = ChaptersDatabase.readProgress(for: book.id)
+        }
+        .sheet(isPresented: $showChapters, onDismiss: {
+            readFraction = ChaptersDatabase.readProgress(for: book.id)
+        }) {
             ChapterListView(book: book)
         }
     }
@@ -162,19 +176,32 @@ struct BookCard: View {
                 .fill(Color(NSColor.windowBackgroundColor))
                 .overlay(RoundedRectangle(cornerRadius: 6)
                     .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1))
-                .frame(width: 160, height: 213)
             if let cover {
                 Image(nsImage: cover)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 160, height: 213)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 Image(systemName: "book.closed.fill")
                     .font(.system(size: 44))
                     .foregroundColor(.secondary.opacity(0.4))
             }
+            // Progress bar pinned to the bottom edge
+            if readFraction > 0 {
+                VStack(spacing: 0) {
+                    Spacer()
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(.black.opacity(0.22))
+                        Rectangle()
+                            .fill(.white.opacity(0.82))
+                            .frame(width: 160 * readFraction)
+                    }
+                    .frame(height: 5)
+                }
+            }
         }
+        .frame(width: 160, height: 213)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private var statusMenu: some View {

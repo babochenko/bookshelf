@@ -84,6 +84,43 @@ enum ChaptersDatabase {
         sqlite3_step(stmt)
     }
 
+    // MARK: - Progress
+
+    /// Fraction (0–1) of the book read, based on pages spanned by done chapters.
+    /// Falls back to chapter-count ratio when page numbers are unavailable.
+    static func readProgress(for assetId: String) -> Double {
+        let chapters = loadChapters(for: assetId)
+        guard !chapters.isEmpty else { return 0 }
+        guard chapters.contains(where: \.done) else { return 0 }
+
+        // Page-based: sort chapters that have a page number
+        let paged = chapters.filter { $0.pageNum != nil }.sorted { $0.pageNum! < $1.pageNum! }
+
+        if paged.count >= 2 {
+            let firstPage = paged.first!.pageNum!
+            let lastPage  = paged.last!.pageNum!
+            guard lastPage > firstPage else {
+                return Double(chapters.filter(\.done).count) / Double(chapters.count)
+            }
+            // Estimate last chapter's length as the average span of all preceding chapters
+            let avgSpan = Double(lastPage - firstPage) / Double(paged.count - 1)
+
+            var readPages  = 0.0
+            var totalPages = 0.0
+            for (i, ch) in paged.enumerated() {
+                let span = i < paged.count - 1
+                    ? Double(paged[i + 1].pageNum! - ch.pageNum!)
+                    : avgSpan
+                totalPages += span
+                if ch.done { readPages += span }
+            }
+            return totalPages > 0 ? min(1.0, readPages / totalPages) : 0
+        }
+
+        // Chapter-count fallback (EPUBs without page numbers)
+        return Double(chapters.filter(\.done).count) / Double(chapters.count)
+    }
+
     static func hasChapters(for assetId: String) -> Bool {
         guard let db = openRO() else { return false }
         defer { sqlite3_close(db) }
