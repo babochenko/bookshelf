@@ -13,14 +13,14 @@ struct ContentView: View {
                     .padding(60)
             } else {
                 LazyVGrid(columns: columns, spacing: 24) {
-                    ForEach(books) { book in
-                        BookCard(book: book)
+                    ForEach($books) { $book in
+                        BookCard(book: $book)
                     }
                 }
                 .padding(20)
             }
         }
-        .frame(minWidth: 600, minHeight: 400)
+        .frame(minWidth: 640, minHeight: 400)
         .task {
             books = BooksDatabase.loadBooks()
         }
@@ -28,8 +28,9 @@ struct ContentView: View {
 }
 
 struct BookCard: View {
-    let book: Book
+    @Binding var book: Book
     @State private var cover: NSImage?
+    @State private var showingStatusMenu = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -47,6 +48,8 @@ struct BookCard: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
                 .frame(width: 160, alignment: .leading)
+
+            statusButton
         }
         .contentShape(Rectangle())
         .onTapGesture { openBook() }
@@ -75,6 +78,48 @@ struct BookCard: View {
                     .font(.system(size: 44))
                     .foregroundColor(.secondary.opacity(0.4))
             }
+        }
+    }
+
+    private var statusButton: some View {
+        Menu {
+            ForEach(ReadingStatus.allCases, id: \.rawValue) { s in
+                Button {
+                    book.status = s
+                    BooksDatabase.saveStatus(s, for: book.id)
+                } label: {
+                    if s == book.status {
+                        Label(s.label, systemImage: "checkmark")
+                    } else {
+                        Text(s.label)
+                    }
+                }
+            }
+        } label: {
+            statusBadge(book.status)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .onTapGesture {} // absorb so card tap-to-open doesn't fire
+    }
+
+    private func statusBadge(_ status: ReadingStatus) -> some View {
+        Text(status.label)
+            .font(.system(size: 9, weight: .bold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(statusColor(status).opacity(0.15))
+            .foregroundColor(statusColor(status))
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(statusColor(status).opacity(0.4), lineWidth: 0.5))
+    }
+
+    private func statusColor(_ status: ReadingStatus) -> Color {
+        switch status {
+        case .reading: return .blue
+        case .nextUp:  return .orange
+        case .toRead:  return .secondary
+        case .read:    return .green
         }
     }
 
