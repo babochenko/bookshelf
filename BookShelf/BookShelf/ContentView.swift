@@ -30,7 +30,8 @@ struct ContentView: View {
 struct BookCard: View {
     @Binding var book: Book
     @State private var cover: NSImage?
-    @State private var showingStatusMenu = false
+    @State private var showChapters = false
+    @State private var hasChapters = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -49,11 +50,30 @@ struct BookCard: View {
                 .lineLimit(1)
                 .frame(width: 160, alignment: .leading)
 
-            statusButton
+            HStack(spacing: 6) {
+                statusButton
+                if hasChapters {
+                    Button {
+                        showChapters = true
+                    } label: {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show chapters")
+                }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture { openBook() }
-        .task { await loadCover() }
+        .task {
+            await loadCover()
+            hasChapters = ChaptersDatabase.hasChapters(for: book.id)
+        }
+        .sheet(isPresented: $showChapters) {
+            ChapterListView(book: book)
+        }
     }
 
     @ViewBuilder

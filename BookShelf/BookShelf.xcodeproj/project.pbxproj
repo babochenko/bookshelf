@@ -12,6 +12,8 @@
 		E6F7A8B9C0D1E2F3A4B5C6D7 /* BookModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F1A2B3C4D5E6F7A8B9C0D1 /* BookModel.swift */; };
 		F7A8B9C0D1E2F3A4B5C6D7E8 /* BooksDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7A8B9C0D1E2 /* BooksDatabase.swift */; };
 		A8B9C0D1E2F3A4B5C6D7E8F9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A4 /* Assets.xcassets */; };
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* ChaptersDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E7F8A9B0C1D2E3F4A5 /* ChaptersDatabase.swift */; };
+		C2D3E4F5A6B7C8D9E0F1A2B4 /* ChapterListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5D6E7F8A9B0C1D2E3F4A5B6 /* ChapterListView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +25,8 @@
 		A2B3C4D5E6F7A8B9C0D1E2F3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B3C4D5E6F7A8B9C0D1E2F3A4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* BookShelf.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BookShelf.entitlements; sourceTree = "<group>"; };
+		B4C5D6E7F8A9B0C1D2E3F4A5 /* ChaptersDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChaptersDatabase.swift; sourceTree = "<group>"; };
+		C5D6E7F8A9B0C1D2E3F4A5B6 /* ChapterListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChapterListView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +63,8 @@
 				D9E0F1A2B3C4D5E6F7A8B9C0 /* ContentView.swift */,
 				E0F1A2B3C4D5E6F7A8B9C0D1 /* BookModel.swift */,
 				F1A2B3C4D5E6F7A8B9C0D1E2 /* BooksDatabase.swift */,
+				B4C5D6E7F8A9B0C1D2E3F4A5 /* ChaptersDatabase.swift */,
+				C5D6E7F8A9B0C1D2E3F4A5B6 /* ChapterListView.swift */,
 				B3C4D5E6F7A8B9C0D1E2F3A4 /* Assets.xcassets */,
 				A2B3C4D5E6F7A8B9C0D1E2F3 /* Info.plist */,
 				A3B4C5D6E7F8A9B0C1D2E3F4 /* BookShelf.entitlements */,
@@ -139,6 +145,8 @@
 				D5E6F7A8B9C0D1E2F3A4B5C6 /* ContentView.swift in Sources */,
 				E6F7A8B9C0D1E2F3A4B5C6D7 /* BookModel.swift in Sources */,
 				F7A8B9C0D1E2F3A4B5C6D7E8 /* BooksDatabase.swift in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F1A2 /* ChaptersDatabase.swift in Sources */,
+				C2D3E4F5A6B7C8D9E0F1A2B4 /* ChapterListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

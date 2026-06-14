@@ -16,7 +16,9 @@ swiftc \
   "$SRCDIR/BookShelfApp.swift" \
   "$SRCDIR/BookModel.swift" \
   "$SRCDIR/BooksDatabase.swift" \
+  "$SRCDIR/ChaptersDatabase.swift" \
   "$SRCDIR/ContentView.swift" \
+  "$SRCDIR/ChapterListView.swift" \
   -o "$APPDIR/Contents/MacOS/BookShelf"
 
 echo "Built: $APPDIR"
