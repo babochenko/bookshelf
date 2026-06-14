@@ -47,7 +47,7 @@ struct ContentView: View {
                                     }
                                 }
                                 .padding(.horizontal, 28)
-                                .padding(.top, 16)
+                                .padding(.top, 32)
                                 .padding(.bottom, 32)
                             } header: {
                                 SectionHeader(status: status, count: ids.count)
