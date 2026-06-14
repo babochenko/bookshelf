@@ -3,35 +3,119 @@ import QuickLookThumbnailing
 
 struct ContentView: View {
     @State private var books: [Book] = []
+    @State private var booksWithChapters: Set<String> = []
 
     private let columns = [GridItem(.adaptive(minimum: 160, maximum: 190), spacing: 20)]
+
+    private var sections: [(ReadingStatus, [String])] {
+        var grouped = [ReadingStatus: [String]]()
+        for book in books { grouped[book.status, default: []].append(book.id) }
+        return ReadingStatus.allCases.compactMap { status in
+            guard let ids = grouped[status], !ids.isEmpty else { return nil }
+            return (status, ids)
+        }
+    }
 
     var body: some View {
         ScrollView {
             if books.isEmpty {
-                ProgressView("Loading library…")
-                    .padding(60)
+                ProgressView("Loading library…").padding(60)
             } else {
-                LazyVGrid(columns: columns, spacing: 24) {
-                    ForEach($books) { $book in
-                        BookCard(book: $book)
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                    ForEach(sections, id: \.0.rawValue) { status, ids in
+                        Section {
+                            LazyVGrid(columns: columns, spacing: 24) {
+                                ForEach(ids, id: \.self) { id in
+                                    BookCard(
+                                        book: bookBinding(id: id),
+                                        hasChapters: booksWithChapters.contains(id)
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 32)
+                        } header: {
+                            SectionHeader(status: status, count: ids.count)
+                        }
                     }
                 }
-                .padding(20)
             }
         }
         .frame(minWidth: 640, minHeight: 400)
         .task {
             books = BooksDatabase.loadBooks()
+            booksWithChapters = Set(books.filter { ChaptersDatabase.hasChapters(for: $0.id) }.map(\.id))
+            await extractChapters()
+        }
+    }
+
+    private func bookBinding(id: String) -> Binding<Book> {
+        Binding(
+            get: { books.first { $0.id == id } ?? Book(id: "", title: "", author: "", filePath: "", status: .toRead) },
+            set: { new in
+                if let i = books.firstIndex(where: { $0.id == id }) { books[i] = new }
+            }
+        )
+    }
+
+    private func extractChapters() async {
+        for book in books where !booksWithChapters.contains(book.id) {
+            let b = book
+            Task.detached(priority: .background) {
+                await ChapterExtractor.shared.extractIfNeeded(book: b)
+                if ChaptersDatabase.hasChapters(for: b.id) {
+                    _ = await MainActor.run { booksWithChapters.insert(b.id) }
+                }
+            }
         }
     }
 }
 
+// MARK: - Section header
+
+struct SectionHeader: View {
+    let status: ReadingStatus
+    let count: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 7, height: 7)
+                Text(status.label)
+                    .font(.system(size: 11, weight: .bold))
+                    .kerning(0.8)
+                    .foregroundColor(.secondary)
+                Text("· \(count)")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color.secondary.opacity(0.65))
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 20)
+            .padding(.bottom, 10)
+            Divider()
+        }
+        .background(.regularMaterial)
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .reading: return .blue
+        case .nextUp:  return .orange
+        case .toRead:  return .secondary
+        case .read:    return .green
+        }
+    }
+}
+
+// MARK: - Book card
+
 struct BookCard: View {
     @Binding var book: Book
+    let hasChapters: Bool
     @State private var cover: NSImage?
     @State private var showChapters = false
-    @State private var hasChapters = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -51,11 +135,9 @@ struct BookCard: View {
                 .frame(width: 160, alignment: .leading)
 
             HStack(spacing: 6) {
-                statusButton
+                statusMenu
                 if hasChapters {
-                    Button {
-                        showChapters = true
-                    } label: {
+                    Button { showChapters = true } label: {
                         Image(systemName: "list.bullet")
                             .font(.system(size: 10))
                             .foregroundColor(.secondary)
@@ -67,10 +149,7 @@ struct BookCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { openBook() }
-        .task {
-            await loadCover()
-            hasChapters = ChaptersDatabase.hasChapters(for: book.id)
-        }
+        .task { await loadCover() }
         .sheet(isPresented: $showChapters) {
             ChapterListView(book: book)
         }
@@ -81,12 +160,9 @@ struct BookCard: View {
         ZStack {
             RoundedRectangle(cornerRadius: 6)
                 .fill(Color(NSColor.windowBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
-                )
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1))
                 .frame(width: 160, height: 213)
-
             if let cover {
                 Image(nsImage: cover)
                     .resizable()
@@ -101,18 +177,15 @@ struct BookCard: View {
         }
     }
 
-    private var statusButton: some View {
+    private var statusMenu: some View {
         Menu {
             ForEach(ReadingStatus.allCases, id: \.rawValue) { s in
                 Button {
                     book.status = s
                     BooksDatabase.saveStatus(s, for: book.id)
                 } label: {
-                    if s == book.status {
-                        Label(s.label, systemImage: "checkmark")
-                    } else {
-                        Text(s.label)
-                    }
+                    if s == book.status { Label(s.label, systemImage: "checkmark") }
+                    else { Text(s.label) }
                 }
             }
         } label: {
@@ -120,7 +193,7 @@ struct BookCard: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .onTapGesture {} // absorb so card tap-to-open doesn't fire
+        .onTapGesture {}
     }
 
     private func statusBadge(_ status: ReadingStatus) -> some View {
@@ -146,22 +219,17 @@ struct BookCard: View {
     private func openBook() {
         guard let url = book.fileURL else { return }
         guard let booksURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iBooksX") else {
-            NSWorkspace.shared.open(url)
-            return
+            NSWorkspace.shared.open(url); return
         }
         NSWorkspace.shared.open([url], withApplicationAt: booksURL, configuration: .init(), completionHandler: nil)
     }
 
     private func loadCover() async {
         guard let url = book.fileURL else { return }
-        let request = QLThumbnailGenerator.Request(
-            fileAt: url,
-            size: CGSize(width: 320, height: 426),
-            scale: 2.0,
-            representationTypes: .thumbnail
-        )
-        if let thumbnail = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request) {
-            cover = thumbnail.nsImage
+        let req = QLThumbnailGenerator.Request(
+            fileAt: url, size: CGSize(width: 320, height: 426), scale: 2.0, representationTypes: .thumbnail)
+        if let thumb = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: req) {
+            cover = thumb.nsImage
         }
     }
 }

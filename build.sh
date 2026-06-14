@@ -11,12 +11,14 @@ swiftc \
   -framework SwiftUI \
   -framework AppKit \
   -framework QuickLookThumbnailing \
+  -framework PDFKit \
   -parse-as-library \
   -O \
   "$SRCDIR/BookShelfApp.swift" \
   "$SRCDIR/BookModel.swift" \
   "$SRCDIR/BooksDatabase.swift" \
   "$SRCDIR/ChaptersDatabase.swift" \
+  "$SRCDIR/ChapterExtractor.swift" \
   "$SRCDIR/ContentView.swift" \
   "$SRCDIR/ChapterListView.swift" \
   -o "$APPDIR/Contents/MacOS/BookShelf"
