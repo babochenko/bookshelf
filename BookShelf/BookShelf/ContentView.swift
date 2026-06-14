@@ -4,12 +4,19 @@ import QuickLookThumbnailing
 struct ContentView: View {
     @State private var books: [Book] = []
     @State private var booksWithChapters: Set<String> = []
+    @State private var searchText = ""
 
     private let columns = [GridItem(.adaptive(minimum: 160, maximum: 190), spacing: 20)]
 
+    private var filteredBooks: [Book] {
+        guard !searchText.isEmpty else { return books }
+        let q = searchText.lowercased()
+        return books.filter { $0.title.lowercased().contains(q) || $0.author.lowercased().contains(q) }
+    }
+
     private var sections: [(ReadingStatus, [String])] {
         var grouped = [ReadingStatus: [String]]()
-        for book in books { grouped[book.status, default: []].append(book.id) }
+        for book in filteredBooks { grouped[book.status, default: []].append(book.id) }
         return ReadingStatus.allCases.compactMap { status in
             guard let ids = grouped[status], !ids.isEmpty else { return nil }
             return (status, ids)
@@ -17,27 +24,36 @@ struct ContentView: View {
     }
 
     var body: some View {
-        ScrollView {
-            if books.isEmpty {
-                ProgressView("Loading library…").padding(60)
-            } else {
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    ForEach(sections, id: \.0.rawValue) { status, ids in
-                        Section {
-                            LazyVGrid(columns: columns, spacing: 24) {
-                                ForEach(ids, id: \.self) { id in
-                                    BookCard(
-                                        book: bookBinding(id: id),
-                                        hasChapters: booksWithChapters.contains(id)
-                                    )
+        VStack(spacing: 0) {
+            searchBar
+            Divider()
+            ScrollView {
+                if books.isEmpty {
+                    ProgressView("Loading library…").padding(60)
+                } else if sections.isEmpty {
+                    Text("No results for \"\(searchText)\"")
+                        .foregroundColor(.secondary)
+                        .padding(60)
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        ForEach(sections, id: \.0.rawValue) { status, ids in
+                            Section {
+                                LazyVGrid(columns: columns, spacing: 24) {
+                                    ForEach(ids, id: \.self) { id in
+                                        BookCard(
+                                            book: bookBinding(id: id),
+                                            hasChapters: booksWithChapters.contains(id)
+                                        )
+                                    }
                                 }
+                                .padding(.horizontal, 28)
+                                .padding(.bottom, 32)
+                            } header: {
+                                SectionHeader(status: status, count: ids.count)
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 32)
-                        } header: {
-                            SectionHeader(status: status, count: ids.count)
                         }
                     }
+                    .padding(.top, 8)
                 }
             }
         }
@@ -47,6 +63,26 @@ struct ContentView: View {
             booksWithChapters = Set(books.filter { ChaptersDatabase.hasChapters(for: $0.id) }.map(\.id))
             await extractChapters()
         }
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+                .font(.system(size: 13))
+            TextField("Search by title or author…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 9)
     }
 
     private func bookBinding(id: String) -> Binding<Book> {
@@ -91,7 +127,7 @@ struct SectionHeader: View {
                     .font(.system(size: 11))
                     .foregroundColor(Color.secondary.opacity(0.65))
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 28)
             .padding(.top, 20)
             .padding(.bottom, 10)
             Divider()
