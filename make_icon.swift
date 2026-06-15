@@ -22,6 +22,11 @@ func makeIcon(size: CGFloat) -> NSBitmapImageRep {
     c.translateBy(x: 0, y: size)
     c.scaleBy(x: 1, y: -1)
 
+    // ~10% transparent margin each side, matching Apple's icon template safe zone
+    let margin: CGFloat = 100 * s
+    c.translateBy(x: margin, y: margin)
+    c.scaleBy(x: (size - 2*margin)/size, y: (size - 2*margin)/size)
+
     let cs = CGColorSpaceCreateDeviceRGB()
     func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
         CGColor(colorSpace: cs, components: [r/255, g/255, b/255, a])!
