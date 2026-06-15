@@ -5,7 +5,7 @@ struct ContentView: View {
     @State private var books: [Book] = []
     @State private var booksWithChapters: Set<String> = []
     @State private var searchText = ""
-    @State private var isListView = false
+    @AppStorage("isListView") private var isListView = false
 
     private let columns = [GridItem(.adaptive(minimum: 160, maximum: 190), spacing: 20)]
 
