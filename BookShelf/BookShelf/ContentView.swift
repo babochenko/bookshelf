@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var books: [Book] = []
     @State private var booksWithChapters: Set<String> = []
     @State private var searchText = ""
+    @State private var isListView = false
 
     private let columns = [GridItem(.adaptive(minimum: 160, maximum: 190), spacing: 20)]
 
@@ -38,17 +39,30 @@ struct ContentView: View {
                     LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                         ForEach(sections, id: \.0.rawValue) { status, ids in
                             Section {
-                                LazyVGrid(columns: columns, spacing: 24) {
-                                    ForEach(ids, id: \.self) { id in
-                                        BookCard(
-                                            book: bookBinding(id: id),
-                                            hasChapters: booksWithChapters.contains(id)
-                                        )
+                                if isListView {
+                                    LazyVStack(spacing: 0) {
+                                        ForEach(ids, id: \.self) { id in
+                                            BookListRow(
+                                                book: bookBinding(id: id),
+                                                hasChapters: booksWithChapters.contains(id)
+                                            )
+                                            Divider().padding(.leading, 76)
+                                        }
                                     }
+                                    .padding(.vertical, 4)
+                                } else {
+                                    LazyVGrid(columns: columns, spacing: 24) {
+                                        ForEach(ids, id: \.self) { id in
+                                            BookCard(
+                                                book: bookBinding(id: id),
+                                                hasChapters: booksWithChapters.contains(id)
+                                            )
+                                        }
+                                    }
+                                    .padding(.horizontal, 28)
+                                    .padding(.top, 32)
+                                    .padding(.bottom, 32)
                                 }
-                                .padding(.horizontal, 28)
-                                .padding(.top, 32)
-                                .padding(.bottom, 32)
                             } header: {
                                 SectionHeader(status: status, count: ids.count)
                             }
@@ -81,6 +95,16 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
             }
+            Divider().frame(height: 16)
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { isListView.toggle() }
+            } label: {
+                Image(systemName: isListView ? "square.grid.2x2" : "list.bullet")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(isListView ? "Switch to grid" : "Switch to list")
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 9)
@@ -146,7 +170,7 @@ struct SectionHeader: View {
     }
 }
 
-// MARK: - Book card
+// MARK: - Book card (grid)
 
 struct BookCard: View {
     @Binding var book: Book
@@ -222,7 +246,6 @@ struct BookCard: View {
                     .font(.system(size: 44))
                     .foregroundColor(.secondary.opacity(0.4))
             }
-            // Progress bar pinned to the bottom edge
             if readFraction > 0 {
                 VStack(spacing: 0) {
                     Spacer()
@@ -292,6 +315,140 @@ struct BookCard: View {
         guard let url = book.fileURL else { return }
         let req = QLThumbnailGenerator.Request(
             fileAt: url, size: CGSize(width: 320, height: 426), scale: 2.0, representationTypes: .thumbnail)
+        if let thumb = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: req) {
+            cover = thumb.nsImage
+        }
+    }
+}
+
+// MARK: - Book row (list)
+
+struct BookListRow: View {
+    @Binding var book: Book
+    let hasChapters: Bool
+    @State private var cover: NSImage?
+    @State private var showChapters = false
+    @State private var readFraction: Double = 0
+
+    var body: some View {
+        HStack(spacing: 12) {
+            coverThumb
+            VStack(alignment: .leading, spacing: 2) {
+                Text(book.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Text(book.author)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            HStack(spacing: 8) {
+                if readFraction > 0 {
+                    Text("\(Int(readFraction * 100))%")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                }
+                statusMenu
+                if hasChapters {
+                    Button { showChapters = true } label: {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show chapters")
+                }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 7)
+        .contentShape(Rectangle())
+        .onTapGesture { openBook() }
+        .task {
+            await loadCover()
+            readFraction = ChaptersDatabase.readProgress(for: book.id)
+        }
+        .sheet(isPresented: $showChapters, onDismiss: {
+            readFraction = ChaptersDatabase.readProgress(for: book.id)
+        }) {
+            ChapterListView(book: book)
+        }
+    }
+
+    @ViewBuilder
+    private var coverThumb: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color(NSColor.windowBackgroundColor))
+                .overlay(RoundedRectangle(cornerRadius: 3)
+                    .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+            if let cover {
+                Image(nsImage: cover)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.secondary.opacity(0.4))
+            }
+        }
+        .frame(width: 36, height: 48)
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+
+    private var statusMenu: some View {
+        Menu {
+            ForEach(ReadingStatus.allCases, id: \.rawValue) { s in
+                Button {
+                    book.status = s
+                    BooksDatabase.saveStatus(s, for: book.id)
+                } label: {
+                    if s == book.status { Label(s.label, systemImage: "checkmark") }
+                    else { Text(s.label) }
+                }
+            }
+        } label: {
+            statusBadge(book.status)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .onTapGesture {}
+    }
+
+    private func statusBadge(_ status: ReadingStatus) -> some View {
+        Text(status.label)
+            .font(.system(size: 9, weight: .bold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(statusColor(status).opacity(0.15))
+            .foregroundColor(statusColor(status))
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(statusColor(status).opacity(0.4), lineWidth: 0.5))
+    }
+
+    private func statusColor(_ status: ReadingStatus) -> Color {
+        switch status {
+        case .reading: return .blue
+        case .nextUp:  return .orange
+        case .toRead:  return .secondary
+        case .read:    return .green
+        }
+    }
+
+    private func openBook() {
+        guard let url = book.fileURL else { return }
+        guard let booksURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iBooksX") else {
+            NSWorkspace.shared.open(url); return
+        }
+        NSWorkspace.shared.open([url], withApplicationAt: booksURL, configuration: .init(), completionHandler: nil)
+    }
+
+    private func loadCover() async {
+        guard let url = book.fileURL else { return }
+        let req = QLThumbnailGenerator.Request(
+            fileAt: url, size: CGSize(width: 72, height: 96), scale: 2.0, representationTypes: .thumbnail)
         if let thumb = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: req) {
             cover = thumb.nsImage
         }
