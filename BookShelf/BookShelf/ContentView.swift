@@ -6,6 +6,9 @@ struct ContentView: View {
     @State private var booksWithChapters: Set<String> = []
     @State private var searchText = ""
     @AppStorage("isListView") private var isListView = false
+    @State private var isScanning = false
+    @State private var scanResult: String? = nil
+    @State private var showScanPopover = false
 
     private let columns = [GridItem(.adaptive(minimum: 160, maximum: 190), spacing: 20)]
 
@@ -105,6 +108,30 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .help(isListView ? "Switch to grid" : "Switch to list")
+            Button {
+                Task { await rescan() }
+            } label: {
+                if isScanning {
+                    ProgressView().scaleEffect(0.55).frame(width: 13, height: 13)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            .help("Rescan library")
+            .disabled(isScanning)
+            .popover(isPresented: $showScanPopover, arrowEdge: .bottom) {
+                HStack(spacing: 8) {
+                    Image(systemName: (scanResult?.hasPrefix("No") ?? true) ? "checkmark.circle.fill" : "books.vertical.fill")
+                        .foregroundColor((scanResult?.hasPrefix("No") ?? true) ? .secondary : .green)
+                    Text(scanResult ?? "")
+                        .font(.system(size: 13))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 9)
@@ -117,6 +144,21 @@ struct ContentView: View {
                 if let i = books.firstIndex(where: { $0.id == id }) { books[i] = new }
             }
         )
+    }
+
+    private func rescan() async {
+        isScanning = true
+        let fresh = BooksDatabase.loadBooks()
+        let existingIds = Set(books.map(\.id))
+        let added = fresh.filter { !existingIds.contains($0.id) }
+        books = fresh
+        booksWithChapters = Set(fresh.filter { ChaptersDatabase.hasChapters(for: $0.id) }.map(\.id))
+        await extractChapters()
+        scanResult = added.isEmpty
+            ? "No new books found."
+            : "\(added.count) new book\(added.count == 1 ? "" : "s") added."
+        isScanning = false
+        showScanPopover = true
     }
 
     private func extractChapters() async {
