@@ -6,9 +6,12 @@ actor ChapterExtractor {
     private var inProgress = Set<String>()
 
     func extractIfNeeded(book: Book) async {
-        guard !inProgress.contains(book.id) else { return }
         guard !ChaptersDatabase.hasBeenExtracted(for: book.id) else { return }
+        await extract(book: book)
+    }
 
+    func extract(book: Book) async {
+        guard !inProgress.contains(book.id) else { return }
         inProgress.insert(book.id)
         defer { inProgress.remove(book.id) }
 

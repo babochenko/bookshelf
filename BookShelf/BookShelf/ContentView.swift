@@ -47,7 +47,8 @@ struct ContentView: View {
                                         ForEach(ids, id: \.self) { id in
                                             BookListRow(
                                                 book: bookBinding(id: id),
-                                                hasChapters: booksWithChapters.contains(id)
+                                                hasChapters: booksWithChapters.contains(id),
+                                                onChaptersFound: { booksWithChapters.insert(id) }
                                             )
                                             Divider().padding(.leading, 76)
                                         }
@@ -58,7 +59,8 @@ struct ContentView: View {
                                         ForEach(ids, id: \.self) { id in
                                             BookCard(
                                                 book: bookBinding(id: id),
-                                                hasChapters: booksWithChapters.contains(id)
+                                                hasChapters: booksWithChapters.contains(id),
+                                                onChaptersFound: { booksWithChapters.insert(id) }
                                             )
                                         }
                                     }
@@ -217,9 +219,11 @@ struct SectionHeader: View {
 struct BookCard: View {
     @Binding var book: Book
     let hasChapters: Bool
+    let onChaptersFound: () -> Void
     @State private var cover: NSImage?
     @State private var showChapters = false
     @State private var readFraction: Double = 0
+    @State private var isExtracting = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -248,6 +252,26 @@ struct BookCard: View {
                     }
                     .buttonStyle(.plain)
                     .help("Show chapters")
+                } else {
+                    Button {
+                        Task {
+                            isExtracting = true
+                            await ChapterExtractor.shared.extract(book: book)
+                            if ChaptersDatabase.hasChapters(for: book.id) { onChaptersFound() }
+                            isExtracting = false
+                        }
+                    } label: {
+                        if isExtracting {
+                            ProgressView().scaleEffect(0.45).frame(width: 10, height: 10)
+                        } else {
+                            Image(systemName: "wand.and.stars")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Extract chapters")
+                    .disabled(isExtracting)
                 }
                 if readFraction > 0 {
                     Spacer()
@@ -368,9 +392,11 @@ struct BookCard: View {
 struct BookListRow: View {
     @Binding var book: Book
     let hasChapters: Bool
+    let onChaptersFound: () -> Void
     @State private var cover: NSImage?
     @State private var showChapters = false
     @State private var readFraction: Double = 0
+    @State private var isExtracting = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -401,6 +427,26 @@ struct BookListRow: View {
                     }
                     .buttonStyle(.plain)
                     .help("Show chapters")
+                } else {
+                    Button {
+                        Task {
+                            isExtracting = true
+                            await ChapterExtractor.shared.extract(book: book)
+                            if ChaptersDatabase.hasChapters(for: book.id) { onChaptersFound() }
+                            isExtracting = false
+                        }
+                    } label: {
+                        if isExtracting {
+                            ProgressView().scaleEffect(0.5).frame(width: 10, height: 10)
+                        } else {
+                            Image(systemName: "wand.and.stars")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Extract chapters")
+                    .disabled(isExtracting)
                 }
             }
         }
